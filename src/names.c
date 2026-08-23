@@ -110,6 +110,14 @@ netplan_infiniband_mode_to_str[NETPLAN_IB_MODE_MAX_] = {
 };
 
 static const char* const
+netplan_link_type_to_str[NETPLAN_LINK_TYPE_MAX_] = {
+    [NETPLAN_LINK_TYPE_UNKNOWN] = NULL,
+    [NETPLAN_LINK_TYPE_ETHERNET] = "ethernet",
+    [NETPLAN_LINK_TYPE_INFINIBAND] = "infiniband",
+    [NETPLAN_LINK_TYPE_AUTO] = "auto"
+};
+
+static const char* const
 netplan_key_flags_to_str[NETPLAN_KEY_FLAG_MAX_] = {
     [NETPLAN_KEY_FLAG_NONE] = NULL,
     [NETPLAN_KEY_FLAG_AGENT_OWNED] = "agent-owned",
@@ -138,6 +146,7 @@ NAME_FUNCTION(tunnel_mode, NetplanTunnelMode);
 NAME_FUNCTION(addr_gen_mode, NetplanAddrGenMode);
 NAME_FUNCTION(wifi_mode, NetplanWifiMode);
 NAME_FUNCTION(infiniband_mode, NetplanInfinibandMode);
+NAME_FUNCTION(link_type, NetplanLinkType);
 NAME_FUNCTION(key_flags, NetplanKeyFlags);
 NAME_FUNCTION_FLAGS(vxlan_notification);
 NAME_FUNCTION_FLAGS(vxlan_checksum);

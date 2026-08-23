@@ -95,6 +95,15 @@ typedef enum {
 } NetplanInfinibandMode;
 
 typedef enum {
+    NETPLAN_LINK_TYPE_UNKNOWN = 0,
+    NETPLAN_LINK_TYPE_ETHERNET,
+    NETPLAN_LINK_TYPE_INFINIBAND,
+    NETPLAN_LINK_TYPE_AUTO,
+
+    NETPLAN_LINK_TYPE_MAX_,
+} NetplanLinkType;
+
+typedef enum {
     NETPLAN_WIFI_WOWLAN_DEFAULT           = 1<<0,
     NETPLAN_WIFI_WOWLAN_ANY               = 1<<1,
     NETPLAN_WIFI_WOWLAN_DISCONNECT        = 1<<2,
@@ -431,4 +440,6 @@ struct netplan_net_definition {
     NetplanTristate bridge_learning;
 
     NetplanRAOverrides ra_overrides;
+    /* netplan-feature: link-type */
+    NetplanLinkType link_type;
 };

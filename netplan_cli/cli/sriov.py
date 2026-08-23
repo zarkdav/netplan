@@ -219,6 +219,59 @@ class PCIDevice(object):
         # {"dev":{}}
         return json_output.get("dev", {}).get(pci, {}).get('mode', '__undetermined')
 
+    def devlink_get_ports(self) -> dict:
+        """Query devlink ports
+        :return: dictionary of devlink ports
+        :rtype: dict
+        """
+        devlink_bin = shutil.which('devlink') or '/sbin/devlink'
+        try:
+            output = subprocess.check_output(
+                [
+                    devlink_bin,
+                    "-j",
+                    "port",
+                    "show",
+                ],
+                stderr=subprocess.DEVNULL,
+            )
+            json_output = json.loads(output)
+            return json_output.get("port", {})
+        except (subprocess.CalledProcessError, json.JSONDecodeError):
+            return {}
+
+    def devlink_port_set_type(self, port: typing.Union[str, int], port_type: str):
+        """Set devlink port link type
+        :param port: port identifier (e.g. pci/0000:08:00.0/0 or 0)
+        :type: str or int
+        :param port_type: port type ('eth', 'ib', 'auto', 'ethernet', 'infiniband')
+        :type: str
+        """
+        devlink_bin = shutil.which('devlink') or '/sbin/devlink'
+        if isinstance(port, int) or (isinstance(port, str) and port.isdigit()):
+            port_id = f"pci/{self.pci_addr}/{port}"
+        elif isinstance(port, str) and not port.startswith("pci/"):
+            port_id = f"pci/{self.pci_addr}/{port}"
+        else:
+            port_id = str(port)
+
+        type_val = port_type.lower()
+        if type_val in ("ethernet", "eth"):
+            type_val = "eth"
+        elif type_val in ("infiniband", "ib"):
+            type_val = "ib"
+
+        subprocess.check_call(
+            [
+                devlink_bin,
+                "port",
+                "set",
+                port_id,
+                "type",
+                type_val,
+            ]
+        )
+
     def __str__(self) -> str:
         """String represenation of object
         :return: PCI address of string
@@ -321,9 +374,9 @@ def _get_physical_functions(np_state: netplan.State) -> Dict[str, str]:
             if iface := _get_interface_name_for_netdef(np_state[link.id]):
                 pfs[link.id] = iface
         else:
-            # If a netdef also defines the embedded_switch_mode key we consider it's a PF
-            # This enables us to change the eswitch mode even when the PF has no VFs.
-            if netdef._embedded_switch_mode:
+            # If a netdef also defines the embedded_switch_mode or link_type key we consider it's a PF
+            # This enables us to change the eswitch mode or link type even when the PF has no VFs.
+            if netdef._embedded_switch_mode or netdef._link_type:
                 if iface := _get_interface_name_for_netdef(netdef):
                     pfs[netdef.id] = iface
 
@@ -533,6 +586,28 @@ def apply_sriov_config(config_manager, rootdir='/'):
                     if pcidev.vfs:
                         if not netdef._delay_virtual_functions_rebind:
                             bind_vfs(pcidev.vfs, pcidev.driver)
+
+    # walk the SR-IOV PFs and configure link-type if set
+    for netdef_id, iface in pfs.items():
+        netdef = np_state[netdef_id]
+        if link_type := netdef._link_type:
+            pci_addr = _get_pci_slot_name(iface)
+            pcidev = PCIDevice(pci_addr)
+            existing_ports = pcidev.devlink_get_ports()
+            target_port = None
+            for port_id, port_data in existing_ports.items():
+                if port_id.startswith(f"pci/{pci_addr}/"):
+                    if port_data.get("netdev") == iface or port_data.get("flavour") == "physical":
+                        target_port = port_id
+                        break
+            if not target_port:
+                target_port = f"pci/{pci_addr}/0"
+
+            logging.debug(f'Setting link-type {link_type} on {netdef_id} ({target_port})')
+            try:
+                pcidev.devlink_port_set_type(target_port, link_type)
+            except Exception as e:
+                logging.warning(f'Failed to set link-type on {netdef_id} ({target_port}): {str(e)}')
 
     # setup the required number of VFs per PF
     # at the same time store which PFs got changed in case the NICs

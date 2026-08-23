@@ -159,13 +159,14 @@ _netplan_state_finish_sriov_generate(const NetplanState* np_state, const char* g
          * 1) the user explicitly set a desired number of VFs
          * 2) there is at least one interface with a link to it (meaning the interface is a VF of this PF)
          * 3) the user set the embedded-switch-mode (which can be applied regardless if the interface has VFs)
+         * 4) the user set the link-type
          * */
         for (GList* iterator = np_state->netdefs_ordered; iterator; iterator = iterator->next) {
             def = (NetplanNetDefinition*) iterator->data;
             pf = NULL;
-            if (def->sriov_explicit_vf_count < G_MAXUINT || def->sriov_link || def->embedded_switch_mode) {
+            if (def->sriov_explicit_vf_count < G_MAXUINT || def->sriov_link || def->embedded_switch_mode || def->link_type != NETPLAN_LINK_TYPE_UNKNOWN) {
                 any_sriov = TRUE;
-                if (def->sriov_explicit_vf_count < G_MAXUINT || def->embedded_switch_mode)
+                if (def->sriov_explicit_vf_count < G_MAXUINT || def->embedded_switch_mode || def->link_type != NETPLAN_LINK_TYPE_UNKNOWN)
                     pf = def;
                 else if (def->sriov_link)
                     pf = def->sriov_link;

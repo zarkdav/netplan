@@ -109,6 +109,7 @@ untagged
 veth
 vlan
 Vlans
+VPI
 vrf
 vsctl
 vSwitch

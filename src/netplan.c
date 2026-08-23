@@ -822,6 +822,10 @@ _serialize_yaml(
     YAML_STRING(def, event, emitter, "embedded-switch-mode", def->embedded_switch_mode);
     YAML_BOOL_TRUE(def, event, emitter, "delay-virtual-functions-rebind",
                    def->sriov_delay_virtual_functions_rebind);
+    if (def->link_type != NETPLAN_LINK_TYPE_UNKNOWN) {
+        const char* link_type_str = netplan_link_type_name(def->link_type);
+        YAML_STRING(def, event, emitter, "link-type", link_type_str);
+    }
 
     if (def->type == NETPLAN_DEF_TYPE_VETH && def->veth_peer_link)
         YAML_STRING(def, event, emitter, "peer", def->veth_peer_link->id);

@@ -121,6 +121,9 @@ _netplan_netdef_get_optional(const NetplanNetDefinition* netdef);
 NETPLAN_INTERNAL ssize_t
 _netplan_netdef_get_embedded_switch_mode(const NetplanNetDefinition* netdef, char* out_buffer, size_t out_buf_size);
 
+NETPLAN_INTERNAL NetplanLinkType
+_netplan_netdef_get_link_type(const NetplanNetDefinition* netdef);
+
 NETPLAN_INTERNAL gboolean
 _netplan_netdef_get_delay_virtual_functions_rebind(const NetplanNetDefinition* netdef);
 

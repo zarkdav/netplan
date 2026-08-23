@@ -34,6 +34,7 @@ ffibuilder.cdef("""
     typedef struct netplan_net_definition NetplanNetDefinition;
     typedef enum { ... } NetplanBackend;
     typedef enum { ... } NetplanDefType;
+    typedef enum { ... } NetplanLinkType;
 
     // TODO: Introduce getters for .address/.lifetime/.label to avoid exposing the raw struct
     typedef struct {
@@ -117,6 +118,8 @@ ffibuilder.cdef("""
 
     // NetDefinition (internal)
     ssize_t _netplan_netdef_get_embedded_switch_mode(const NetplanNetDefinition* netdef, char* out_buffer, size_t out_buf_size);
+    NetplanLinkType _netplan_netdef_get_link_type(const NetplanNetDefinition* netdef);
+    const char* netplan_link_type_name(NetplanLinkType val);
     gboolean _netplan_netdef_get_sriov_vlan_filter(const NetplanNetDefinition* netdef);
     guint _netplan_netdef_get_vlan_id(const NetplanNetDefinition* netdef);
     gboolean _netplan_netdef_get_critical(const NetplanNetDefinition* netdef);

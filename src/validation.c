@@ -524,6 +524,15 @@ validate_sriov_rules(const NetplanParser* npp, NetplanNetDefinition* nd, GError*
         if (nd->embedded_switch_mode) {
             is_sriov_pf = TRUE;
         }
+        /* Does it set the link type?
+         * On multi-protocol NICs (e.g. Mellanox ConnectX VPI cards), physical
+         * ports can switch link protocol between Ethernet and InfiniBand (via
+         * devlink port type). This is used in native InfiniBand HPC/AI fabrics
+         * or bare-metal setups where SR-IOV VFs and embedded-switch-mode (which
+         * is Ethernet switchdev specific) are not configured. */
+        if (nd->link_type != NETPLAN_LINK_TYPE_UNKNOWN) {
+            is_sriov_pf = TRUE;
+        }
         if (nd->sriov_delay_virtual_functions_rebind && !is_sriov_pf) {
             valid = yaml_error(npp, node, error, "%s: This is not a SR-IOV PF", nd->id);
             goto sriov_rules_error;

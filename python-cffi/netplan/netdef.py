@@ -164,6 +164,12 @@ class NetDefinition():
         return _string_realloc_call_no_error(lambda b: lib._netplan_netdef_get_embedded_switch_mode(self._ptr, b, len(b)))
 
     @property
+    def _link_type(self) -> Optional[str]:
+        raw = lib._netplan_netdef_get_link_type(self._ptr)
+        name = lib.netplan_link_type_name(raw)
+        return ffi.string(name).decode('utf-8') if name != ffi.NULL else None
+
+    @property
     def _delay_virtual_functions_rebind(self) -> bool:
         return bool(lib._netplan_netdef_get_delay_virtual_functions_rebind(self._ptr))
 

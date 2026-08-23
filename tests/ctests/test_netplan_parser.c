@@ -432,6 +432,103 @@ test_parse_utf8_characters(__unused void** state)
     free(yaml);
 }
 
+void
+test_netplan_parser_link_type(__unused void** state)
+{
+    const char* yaml =
+        "network:\n"
+        "  version: 2\n"
+        "  ethernets:\n"
+        "    eth0:\n"
+        "      link-type: ethernet\n"
+        "    eth1:\n"
+        "      link-type: eth\n"
+        "    eth2:\n"
+        "      link-type: infiniband\n"
+        "    eth3:\n"
+        "      link-type: ib\n"
+        "    eth4:\n"
+        "      link-type: auto\n";
+
+    NetplanState* np_state = load_string_to_netplan_state(yaml);
+
+    NetplanNetDefinition* eth0 = netplan_state_get_netdef(np_state, "eth0");
+    NetplanNetDefinition* eth1 = netplan_state_get_netdef(np_state, "eth1");
+    NetplanNetDefinition* eth2 = netplan_state_get_netdef(np_state, "eth2");
+    NetplanNetDefinition* eth3 = netplan_state_get_netdef(np_state, "eth3");
+    NetplanNetDefinition* eth4 = netplan_state_get_netdef(np_state, "eth4");
+
+    assert_non_null(eth0);
+    assert_non_null(eth1);
+    assert_non_null(eth2);
+    assert_non_null(eth3);
+    assert_non_null(eth4);
+
+    assert_int_equal(_netplan_netdef_get_link_type(eth0), NETPLAN_LINK_TYPE_ETHERNET);
+    assert_int_equal(_netplan_netdef_get_link_type(eth1), NETPLAN_LINK_TYPE_ETHERNET);
+    assert_int_equal(_netplan_netdef_get_link_type(eth2), NETPLAN_LINK_TYPE_INFINIBAND);
+    assert_int_equal(_netplan_netdef_get_link_type(eth3), NETPLAN_LINK_TYPE_INFINIBAND);
+    assert_int_equal(_netplan_netdef_get_link_type(eth4), NETPLAN_LINK_TYPE_AUTO);
+
+    int fd = memfd_create("netplan-tests", 0);
+    netplan_state_dump_yaml(np_state, fd, NULL);
+
+    size_t size = (size_t)lseek(fd, 0, SEEK_CUR) + 1;
+    char* dumped_yaml = malloc(size);
+    memset(dumped_yaml, 0, size);
+    lseek(fd, 0, SEEK_SET);
+    ssize_t res = read(fd, dumped_yaml, size - 1);
+    assert_true(res > 0);
+
+    const char* expected =
+        "network:\n"
+        "  version: 2\n"
+        "  ethernets:\n"
+        "    eth0:\n"
+        "      link-type: \"ethernet\"\n"
+        "    eth1:\n"
+        "      link-type: \"ethernet\"\n"
+        "    eth2:\n"
+        "      link-type: \"infiniband\"\n"
+        "    eth3:\n"
+        "      link-type: \"infiniband\"\n"
+        "    eth4:\n"
+        "      link-type: \"auto\"\n";
+
+    assert_string_equal(dumped_yaml, expected);
+
+    netplan_state_clear(&np_state);
+    close(fd);
+    free(dumped_yaml);
+}
+
+void
+test_netplan_parser_link_type_invalid(__unused void** state)
+{
+    const char* yaml =
+        "network:\n"
+        "  version: 2\n"
+        "  ethernets:\n"
+        "    eth0:\n"
+        "      link-type: invalid\n";
+
+    int fd = memfd_create("netplan-invalid-link-type", 0);
+    assert_int_equal(write(fd, yaml, strlen(yaml)), strlen(yaml));
+    lseek(fd, 0, SEEK_SET);
+
+    NetplanParser* npp = netplan_parser_new();
+    GError* error = NULL;
+
+    gboolean res = netplan_parser_load_yaml_from_fd(npp, fd, &error);
+    assert_false(res);
+    assert_non_null(error);
+    assert_non_null(strstr(error->message, "Value of 'link-type' needs to be 'ethernet', 'eth', 'infiniband', 'ib', or 'auto'"));
+
+    netplan_error_clear(&error);
+    netplan_parser_clear(&npp);
+    close(fd);
+}
+
 int
 setup(__unused void** state)
 {
@@ -458,6 +555,8 @@ main()
            cmocka_unit_test(test_netplan_parser_interface_has_bond_netdef),
            cmocka_unit_test(test_netplan_parser_interface_has_peer_netdef),
            cmocka_unit_test(test_netplan_parser_sriov_embedded_switch),
+           cmocka_unit_test(test_netplan_parser_link_type),
+           cmocka_unit_test(test_netplan_parser_link_type_invalid),
            cmocka_unit_test(test_netplan_parser_process_document_proper_error),
            cmocka_unit_test(test_netplan_parser_process_document_missing_interface_error),
            cmocka_unit_test(test_nm_device_backend_is_nm_by_default),

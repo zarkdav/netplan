@@ -1063,6 +1063,15 @@ some additional properties that can be used for SR-IOV devices.
   >
   > **Requires feature: `infiniband`**
 
+- **`link-type`** (scalar) – since 1.2
+
+  > Change the link layer protocol type of a supported network device (e.g.
+  > Mellanox ConnectX VPI cards supporting Ethernet and InfiniBand). Possible
+  > values are `ethernet` (or `eth`), `infiniband` (or `ib`), or `auto`.
+  > If unspecified, the device or firmware default is used.
+  >
+  > **Requires feature: `link-type`**
+
 (yaml-modems)=
 ## Properties for device type `modems`
 

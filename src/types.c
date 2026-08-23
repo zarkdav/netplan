@@ -379,6 +379,7 @@ reset_netdef(NetplanNetDefinition* netdef, NetplanDefType new_type, NetplanBacke
     netdef->large_receive_offload = NETPLAN_TRISTATE_UNSET;
 
     netdef->ib_mode = NETPLAN_IB_MODE_KERNEL;
+    netdef->link_type = NETPLAN_LINK_TYPE_UNKNOWN;
 
     netdef->tunnel_private_key_flags = NETPLAN_KEY_FLAG_NONE;
 
@@ -595,6 +596,13 @@ _netplan_netdef_get_embedded_switch_mode(const NetplanNetDefinition* netdef, cha
 {
     g_assert(netdef != NULL);
     return netplan_copy_string(netdef->embedded_switch_mode, out_buffer, out_buf_size);
+}
+
+NetplanLinkType
+_netplan_netdef_get_link_type(const NetplanNetDefinition* netdef)
+{
+    g_assert(netdef != NULL);
+    return netdef->link_type;
 }
 
 gboolean

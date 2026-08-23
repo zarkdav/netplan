@@ -1406,6 +1406,81 @@ MODALIAS=pci:v00008086d0000156Fsv000017AAsd00002245bc02sc00i00
         pcidev.ensure_mlx5_switchdev_prerequisites()
         param_set_mock.assert_not_called()
 
+    @patch('subprocess.check_output')
+    def test_PCIDevice_devlink_get_ports(self, check_output_mock):
+        check_output_mock.return_value = b'{"port":{"pci/0000:03:00.0/0":{"flavour":"physical","netdev":"enp1"}}}'
+        pcidev = sriov.PCIDevice('0000:03:00.0')
+        ports = pcidev.devlink_get_ports()
+        self.assertEqual(ports, {"pci/0000:03:00.0/0": {"flavour": "physical", "netdev": "enp1"}})
+        devlink_bin = shutil.which('devlink') or '/sbin/devlink'
+        check_output_mock.assert_called_once_with([devlink_bin, '-j', 'port', 'show'], stderr=-3)
+
+    @patch('subprocess.check_output')
+    def test_PCIDevice_devlink_get_ports_failure(self, check_output_mock):
+        check_output_mock.side_effect = subprocess.CalledProcessError(1, None)
+        pcidev = sriov.PCIDevice('0000:03:00.0')
+        self.assertEqual(pcidev.devlink_get_ports(), {})
+
+    @patch('subprocess.check_call')
+    def test_PCIDevice_devlink_port_set_type(self, check_call_mock):
+        pcidev = sriov.PCIDevice('0000:03:00.0')
+        pcidev.devlink_port_set_type(0, 'infiniband')
+        devlink_bin = shutil.which('devlink') or '/sbin/devlink'
+        check_call_mock.assert_called_once_with([
+            devlink_bin, 'port', 'set', 'pci/0000:03:00.0/0', 'type', 'ib'
+        ])
+
+    @patch('subprocess.check_call')
+    def test_PCIDevice_devlink_port_set_type_ethernet(self, check_call_mock):
+        pcidev = sriov.PCIDevice('0000:03:00.0')
+        pcidev.devlink_port_set_type('pci/0000:03:00.0/1', 'ethernet')
+        devlink_bin = shutil.which('devlink') or '/sbin/devlink'
+        check_call_mock.assert_called_once_with([
+            devlink_bin, 'port', 'set', 'pci/0000:03:00.0/1', 'type', 'eth'
+        ])
+
+    @patch('netplan_cli.cli.utils.get_interface_macaddress')
+    @patch('netplan_cli.cli.utils.get_interfaces')
+    @patch('netplan_cli.cli.sriov._get_vf_number_per_pf')
+    @patch('netplan_cli.cli.sriov._get_virtual_functions')
+    @patch('netplan_cli.cli.sriov._get_physical_functions')
+    @patch('netplan_cli.cli.sriov.set_numvfs_for_pf')
+    @patch('netplan_cli.cli.sriov.perform_hardware_specific_quirks')
+    @patch('subprocess.check_call')
+    @patch('netplan_cli.cli.sriov.PCIDevice.devlink_get_ports')
+    @patch('netplan_cli.cli.sriov._get_pci_slot_name')
+    def test_apply_sriov_config_link_type(self, gpsn, pcidevice_get_ports, scc, quirks, set_numvfs,
+                                          get_phys, get_virt, get_num, netifs, gima):
+        self._prepare_sysfs_dir_structure(pf=('enp1', '0000:03:00.0'),
+                                          vfs=[],
+                                          pf_driver='mlx5_core')
+        gpsn.return_value = '0000:03:00.0'
+        pcidevice_get_ports.return_value = {
+            'pci/0000:03:00.0/0': {'flavour': 'physical', 'netdev': 'enp1'}
+        }
+        gima.return_value = '00:11:22:33:44:55'
+
+        with open(os.path.join(self.workdir.name, "etc/netplan/test.yaml"), 'w') as fd:
+            print('''network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    enp1:
+      link-type: infiniband
+''', file=fd)
+
+        netifs.return_value = ['enp1']
+        get_num.return_value = {}
+        get_virt.return_value = {}
+        get_phys.return_value = {'enp1': 'enp1'}
+
+        sriov.apply_sriov_config(self.configmanager, rootdir=self.workdir.name)
+
+        devlink_bin = shutil.which('devlink') or '/sbin/devlink'
+        scc.assert_called_once_with([
+            devlink_bin, 'port', 'set', 'pci/0000:03:00.0/0', 'type', 'ib'
+        ])
+
 
 class TestParser(TestBase):
     def test_eswitch_mode(self):
@@ -1643,3 +1718,37 @@ ExecStart=/usr/sbin/netplan apply --sriov-only
     engreen:
       embedded-switch-mode: invalid''', expect_fail=True)
         self.assertIn("needs to be 'switchdev' or 'legacy'", err)
+
+    def test_link_type(self):
+        self.generate('''network:
+  version: 2
+  ethernets:
+    engreen:
+      link-type: infiniband
+    enblue:
+      match: {driver: fake_driver}
+      set-name: enblue
+      link-type: ethernet''')
+        self.assert_sriov({'apply.service': '''[Unit]
+Description=Apply SR-IOV configuration
+DefaultDependencies=no
+After=openibd.service
+Before=network-pre.target
+After=sys-subsystem-net-devices-engreen.device
+After=sys-subsystem-net-devices-enblue.device
+
+[Service]
+Type=oneshot
+ExecStartPre=udevadm control --reload
+ExecStartPre=udevadm trigger --action=add --subsystem-match=net
+ExecStartPre=udevadm settle
+ExecStart=/usr/sbin/netplan apply --sriov-only
+'''})
+
+    def test_invalid_link_type(self):
+        err = self.generate('''network:
+  version: 2
+  ethernets:
+    engreen:
+      link-type: invalid''', expect_fail=True)
+        self.assertIn("needs to be 'ethernet', 'eth', 'infiniband', 'ib', or 'auto'", err)

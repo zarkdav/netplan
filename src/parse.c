@@ -614,6 +614,20 @@ handle_ib_mode(NetplanParser* npp, yaml_node_t* node, __unused const void* data,
     return TRUE;
 }
 
+STATIC gboolean
+handle_link_type(NetplanParser* npp, yaml_node_t* node, __unused const void* data, GError** error)
+{
+    if (g_strcmp0(scalar(node), "ethernet") == 0 || g_strcmp0(scalar(node), "eth") == 0)
+        npp->current.netdef->link_type = NETPLAN_LINK_TYPE_ETHERNET;
+    else if (g_strcmp0(scalar(node), "infiniband") == 0 || g_strcmp0(scalar(node), "ib") == 0)
+        npp->current.netdef->link_type = NETPLAN_LINK_TYPE_INFINIBAND;
+    else if (g_strcmp0(scalar(node), "auto") == 0)
+        npp->current.netdef->link_type = NETPLAN_LINK_TYPE_AUTO;
+    else
+        return yaml_error(npp, node, error, "Value of 'link-type' needs to be 'ethernet', 'eth', 'infiniband', 'ib', or 'auto'");
+    return TRUE;
+}
+
 /**
  * Generic handler for setting a npp->current.netdef ID/iface name field referring to an
  * existing ID from a scalar node. This handler also includes a special case
@@ -3025,6 +3039,7 @@ static const mapping_entry_handler ethernet_def_handlers[] = {
     {"embedded-switch-mode", YAML_SCALAR_NODE, {.generic=handle_embedded_switch_mode}, netdef_offset(embedded_switch_mode)},
     {"delay-virtual-functions-rebind", YAML_SCALAR_NODE, {.generic=handle_netdef_bool}, netdef_offset(sriov_delay_virtual_functions_rebind)},
     {"infiniband-mode", YAML_SCALAR_NODE, {.generic=handle_ib_mode}, netdef_offset(ib_mode)},
+    {"link-type", YAML_SCALAR_NODE, {.generic=handle_link_type}, netdef_offset(link_type)},
     {NULL}
 };
 

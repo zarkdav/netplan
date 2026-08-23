@@ -44,6 +44,9 @@ netplan_wifi_mode_name(NetplanWifiMode val);
 const char*
 netplan_infiniband_mode_name(NetplanInfinibandMode val);
 
+NETPLAN_INTERNAL const char*
+netplan_link_type_name(NetplanLinkType val);
+
 const char*
 netplan_key_flags_name(NetplanKeyFlags val);
 
